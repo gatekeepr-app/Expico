@@ -1,0 +1,52 @@
+expico/
+│
+├── index.php
+├── login.php
+├── register.php
+├── logout.php
+├── dashboard.php
+│
+├── config/
+│   └── database.php
+│
+├── auth/
+│   ├── login_process.php
+│   └── register_process.php
+│
+├── groups/
+│   ├── create.php
+│   ├── join.php
+│   ├── members.php
+│   └── details.php
+│
+├── expenses/
+│   ├── add.php
+│   ├── list.php
+│   └── details.php
+│
+├── settlements/
+│   └── index.php
+│
+├── subscriptions/
+│   └── index.php
+│
+├── deadlines/
+│   └── index.php
+│
+├── notifications/
+│   └── index.php
+│
+├── payment_methods/
+│   └── index.php
+│
+├── css/
+│   └── style.css
+│
+├── js/
+│   └── app.js
+│
+└── includes/
+    ├── header.php
+    ├── navbar.php
+    ├── sidebar.php
+    └── footer.php 
