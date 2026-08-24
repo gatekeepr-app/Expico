@@ -1,7 +1,7 @@
 # groups/pay_due.php — Pay Due (Group Settlement)
 
 ## What it does
-Lets the current user pay their outstanding dues within a specific group. Admins can also trigger a settlement request that notifies all members.
+Lets the current user pay their outstanding dues within a specific group. Shows the total amount that needs to be paid. Admins can also trigger a settlement request that notifies all members.
 
 ## How it works in code
 
@@ -22,6 +22,7 @@ Lets the current user pay their outstanding dues within a specific group. Admins
 4. Redirects back to the same page.
 
 ### Display
+- **Summary card**: Shows group name, settlement deadline, and whether members can pay now.
 - **Your Dues**: List of net amounts the user owes (or is owed), with a PAY DUE button for each.
 - **Group Due Map**: Shows all dues across all group members (not just the current user's).
 
@@ -29,3 +30,4 @@ Lets the current user pay their outstanding dues within a specific group. Admins
 - The settlement deadline gates when payments can be made.
 - Payments settle ALL dues between two users in the group at once (not per-expense).
 - The notification system is integrated — both payer and receiver get notified.
+- Admin "ASK FOR SETTLEMENT NOW" sets the deadline to today, activating PAY DUE buttons.

@@ -86,17 +86,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             }
 
             $category_id = (int) ($expense["category_id"] ?? 0);
+            $lower_cat = strtolower($category);
             if ($category !== "" && $category_id > 0) {
                 $description = "Updated from expense form";
                 $stmt = $conn->prepare("UPDATE categories SET category_name = ?, description = ? WHERE category_id = ? AND expense_id = ?");
-                $stmt->bind_param("ssii", $category, $description, $category_id, $expense_id);
+                $stmt->bind_param("ssii", $lower_cat, $description, $category_id, $expense_id);
                 $stmt->execute();
             } elseif ($category !== "") {
-                $category_id = (int) ($conn->query("SELECT COALESCE(MAX(category_id), 0) + 1 AS next_id FROM categories")->fetch_assoc()["next_id"] ?? 1);
-                $description = "Updated from expense form";
-                $stmt = $conn->prepare("INSERT INTO categories (category_id, category_name, description, expense_id) VALUES (?, ?, ?, ?)");
-                $stmt->bind_param("issi", $category_id, $category, $description, $expense_id);
-                $stmt->execute();
+                $check = $conn->prepare("SELECT category_id FROM categories WHERE LOWER(category_name) = ? AND expense_id = ? LIMIT 1");
+                $check->bind_param("si", $lower_cat, $expense_id);
+                $check->execute();
+                if ($check->get_result()->num_rows === 0) {
+                    $category_id = (int) ($conn->query("SELECT COALESCE(MAX(category_id), 0) + 1 AS next_id FROM categories")->fetch_assoc()["next_id"] ?? 1);
+                    $description = "Updated from expense form";
+                    $stmt = $conn->prepare("INSERT INTO categories (category_id, category_name, description, expense_id) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("issi", $category_id, $lower_cat, $description, $expense_id);
+                    $stmt->execute();
+                }
             } elseif ($category_id > 0) {
                 $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ? AND expense_id = ?");
                 $stmt->bind_param("ii", $category_id, $expense_id);
@@ -125,7 +131,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $expense["title"] = $title;
     $expense["amount"] = $amount;
     $expense["expense_date"] = $expense_date;
-    $expense["category_name"] = $category;
+    $expense["category_name"] = strtolower($category);
     $expense["payment_method_id"] = $payment_method_id;
     $selected_participants = $valid_participants;
 }
@@ -145,7 +151,7 @@ include "../includes/header.php";
     <div class="form-group"><label for="title">Expense Title</label><input id="title" name="title" type="text" value="<?= htmlspecialchars($expense["title"]) ?>" required></div>
     <div class="form-group"><label for="amount">Amount</label><input id="amount" name="amount" type="number" min="0.01" step="0.01" value="<?= htmlspecialchars((string) $expense["amount"]) ?>" data-split-amount required></div>
     <div class="form-group"><label for="expense_date">Date</label><input id="expense_date" name="expense_date" type="date" value="<?= htmlspecialchars($expense["expense_date"]) ?>" required></div>
-    <div class="form-group"><label for="category">Category</label><input id="category" name="category" type="text" value="<?= htmlspecialchars($expense["category_name"] ?? "") ?>" placeholder="Food, Transport, Rent"></div>
+    <div class="form-group"><label for="category">Category</label><input id="category" name="category" type="text" value="<?= htmlspecialchars(format_category($expense["category_name"] ?? "")) ?>" placeholder="Food, Transport, Rent"></div>
     <div class="form-group">
         <label for="payment_method_id">Payment Method</label>
         <select id="payment_method_id" name="payment_method_id">

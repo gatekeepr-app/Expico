@@ -10,6 +10,18 @@ if (!isset($_SESSION["user_id"])) {
 $user_id = (int) $_SESSION["user_id"];
 $selected_group_id = (int) ($_GET["group_id"] ?? $_POST["group_id"] ?? 0);
 $error = "";
+$group_blocked = false;
+
+if ($selected_group_id > 0) {
+    $stmt = $conn->prepare("SELECT settlement_deadline FROM groups WHERE group_id = ? LIMIT 1");
+    $stmt->bind_param("i", $selected_group_id);
+    $stmt->execute();
+    $group_info = $stmt->get_result()->fetch_assoc();
+    $deadline = $group_info["settlement_deadline"] ?? null;
+    if ($deadline !== null && $deadline !== "" && $deadline <= date("Y-m-d")) {
+        $group_blocked = true;
+    }
+}
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $title = trim($_POST["title"] ?? "");
@@ -23,7 +35,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $stmt->execute();
     $has_access = $stmt->get_result()->num_rows > 0;
 
-    if ($title === "" || $amount <= 0 || !$has_access) {
+    $post_blocked = false;
+    if ($group_id > 0) {
+        $stmt = $conn->prepare("SELECT settlement_deadline FROM groups WHERE group_id = ? LIMIT 1");
+        $stmt->bind_param("i", $group_id);
+        $stmt->execute();
+        $pg = $stmt->get_result()->fetch_assoc();
+        $pd = $pg["settlement_deadline"] ?? null;
+        if ($pd !== null && $pd !== "" && $pd <= date("Y-m-d")) {
+            $post_blocked = true;
+        }
+    }
+
+    if ($post_blocked) {
+        $error = "Settlement deadline has passed. Cannot add expenses to this group.";
+    } elseif ($title === "" || $amount <= 0 || !$has_access) {
         $error = "Enter a valid title, amount, and group.";
     } elseif (count($participants) === 0) {
         $error = "Select at least one participant.";
@@ -49,11 +75,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $category = trim($_POST["category"] ?? "");
             if ($category !== "") {
-                $category_id = (int) ($conn->query("SELECT COALESCE(MAX(category_id), 0) + 1 AS next_id FROM categories")->fetch_assoc()["next_id"] ?? 1);
-                $description = "Added from expense form";
-                $stmt = $conn->prepare("INSERT INTO categories (category_id, category_name, description, expense_id) VALUES (?, ?, ?, ?)");
-                $stmt->bind_param("issi", $category_id, $category, $description, $expense_id);
-                $stmt->execute();
+                $lower_cat = strtolower($category);
+                $check = $conn->prepare("SELECT category_id FROM categories WHERE LOWER(category_name) = ? AND expense_id = ? LIMIT 1");
+                $check->bind_param("si", $lower_cat, $expense_id);
+                $check->execute();
+                if ($check->get_result()->num_rows === 0) {
+                    $category_id = (int) ($conn->query("SELECT COALESCE(MAX(category_id), 0) + 1 AS next_id FROM categories")->fetch_assoc()["next_id"] ?? 1);
+                    $description = "Added from expense form";
+                    $stmt = $conn->prepare("INSERT INTO categories (category_id, category_name, description, expense_id) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("issi", $category_id, $lower_cat, $description, $expense_id);
+                    $stmt->execute();
+                }
             }
 
             $payment_method_id = (int) ($_POST["payment_method_id"] ?? 0);
@@ -113,6 +145,12 @@ include "../includes/header.php";
 
 <?php if ($error): ?><div class="alert error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
+<?php if ($group_blocked): ?>
+<div class="empty-state">
+    <h3>Settlement period active</h3>
+    <p>Cannot add expenses. The settlement deadline for this group has passed. Ask the admin to extend the deadline to add new expenses.</p>
+</div>
+<?php else: ?>
 <form class="form-card" method="POST">
     <div class="form-group"><label for="title">Expense Title</label><input id="title" name="title" type="text" placeholder="Dinner" required></div>
     <div class="form-group"><label for="amount">Amount</label><input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="1200" data-split-amount required></div>
@@ -158,5 +196,6 @@ include "../includes/header.php";
     <br>
     <button class="primary-button full-width" type="submit">ADD EXPENSE</button>
 </form>
+<?php endif; ?>
 
 <?php include "../includes/footer.php"; ?>

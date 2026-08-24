@@ -28,7 +28,7 @@ include "../includes/header.php";
 <div class="card-list">
     <?php if ($subscriptions->num_rows > 0): while ($sub = $subscriptions->fetch_assoc()): ?>
         <a class="group-card" href="details.php?subscription_id=<?= (int) $sub["subscription_id"] ?>">
-            <div class="group-card-top"><div><h3><?= htmlspecialchars($sub["name"]) ?></h3><p class="group-meta"><?= htmlspecialchars($sub["billing_cycle"] === "one_time" ? "One Time" : ($sub["billing_cycle"] ?: "cycle not set")) ?> · <?= htmlspecialchars($sub["category_name"] ?: "Uncategorized") ?></p></div><span class="badge"><?= money($sub["amount"]) ?></span></div>
+            <div class="group-card-top"><div><h3><?= htmlspecialchars($sub["name"]) ?></h3><p class="group-meta"><?= htmlspecialchars($sub["billing_cycle"] === "one_time" ? "One Time" : ($sub["billing_cycle"] ?: "cycle not set")) ?> · <?= htmlspecialchars(format_category($sub["category_name"]) ?: "Uncategorized") ?></p></div><span class="badge"><?= money($sub["amount"]) ?></span></div>
             <div class="group-stats"><div class="stat-pill"><span>Group</span><strong><?= htmlspecialchars($sub["group_name"] ?: "Personal") ?></strong></div><div class="stat-pill"><span>Your share</span><strong><?= money($sub["share_amount"] ?? $sub["amount"]) ?></strong></div></div>
             <div class="group-stats"><div class="stat-pill"><span>Next payment</span><strong><?= htmlspecialchars($sub["next_due_date"] ?: "Not set") ?></strong></div><div class="stat-pill"><span>Split</span><strong><?= (int) ($sub["participant_count"] ?? 1) ?> people</strong></div></div>
         </a>

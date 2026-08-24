@@ -10,6 +10,18 @@ if (!isset($_SESSION["user_id"])) {
 $user_id = (int) $_SESSION["user_id"];
 $selected_group_id = (int) ($_GET["group_id"] ?? $_POST["group_id"] ?? 0);
 $error = "";
+$group_blocked = false;
+
+if ($selected_group_id > 0) {
+    $stmt = $conn->prepare("SELECT settlement_deadline FROM groups WHERE group_id = ? LIMIT 1");
+    $stmt->bind_param("i", $selected_group_id);
+    $stmt->execute();
+    $group_info = $stmt->get_result()->fetch_assoc();
+    $deadline = $group_info["settlement_deadline"] ?? null;
+    if ($deadline !== null && $deadline !== "" && $deadline <= date("Y-m-d")) {
+        $group_blocked = true;
+    }
+}
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $name = trim($_POST["name"] ?? "");
@@ -56,16 +68,39 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } elseif (!$payment_method_valid) {
         $error = "Select a valid payment method.";
     } else {
-        $conn->begin_transaction();
-        try {
+        $post_blocked = false;
+        if ($group_id > 0) {
+            $stmt = $conn->prepare("SELECT settlement_deadline FROM groups WHERE group_id = ? LIMIT 1");
+            $stmt->bind_param("i", $group_id);
+            $stmt->execute();
+            $pg = $stmt->get_result()->fetch_assoc();
+            $pd = $pg["settlement_deadline"] ?? null;
+            if ($pd !== null && $pd !== "" && $pd <= date("Y-m-d")) {
+                $post_blocked = true;
+            }
+        }
+
+        if ($post_blocked) {
+            $error = "Settlement deadline has passed. Cannot add subscriptions to this group.";
+        } else {
+            $conn->begin_transaction();
+            try {
             $category_id = null;
             if ($category_name !== "") {
-                $category_id = (int) ($conn->query("SELECT COALESCE(MAX(category_id), 0) + 1 AS next_id FROM categories")->fetch_assoc()["next_id"] ?? 1);
-                $description = "Added from subscription form";
-                $expense_id = null;
-                $stmt = $conn->prepare("INSERT INTO categories (category_id, category_name, description, expense_id) VALUES (?, ?, ?, ?)");
-                $stmt->bind_param("issi", $category_id, $category_name, $description, $expense_id);
-                $stmt->execute();
+                $lower_cat = strtolower($category_name);
+                $check = $conn->prepare("SELECT category_id FROM categories WHERE LOWER(category_name) = ? LIMIT 1");
+                $check->bind_param("s", $lower_cat);
+                $check->execute();
+                $existing = $check->get_result()->fetch_assoc();
+                if ($existing) {
+                    $category_id = (int) $existing["category_id"];
+                } else {
+                    $category_id = (int) ($conn->query("SELECT COALESCE(MAX(category_id), 0) + 1 AS next_id FROM categories")->fetch_assoc()["next_id"] ?? 1);
+                    $description = "Added from subscription form";
+                    $stmt = $conn->prepare("INSERT INTO categories (category_id, category_name, description) VALUES (?, ?, ?)");
+                    $stmt->bind_param("iss", $category_id, $lower_cat, $description);
+                    $stmt->execute();
+                }
             }
 
             $subscription_id = (int) ($conn->query("SELECT COALESCE(MAX(subscription_id), 0) + 1 AS next_id FROM subscriptions")->fetch_assoc()["next_id"] ?? 1);
@@ -103,6 +138,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         } catch (Throwable $exception) {
             $conn->rollback();
             $error = "Could not add the subscription. Please try again.";
+        }
         }
     }
 }
@@ -148,6 +184,12 @@ include "../includes/header.php";
 
 <?php if ($error): ?><div class="alert error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
+<?php if ($group_blocked): ?>
+<div class="empty-state">
+    <h3>Settlement period active</h3>
+    <p>Cannot add subscriptions. The settlement deadline for this group has passed. Ask the admin to extend the deadline to add new subscriptions.</p>
+</div>
+<?php else: ?>
 <form class="form-card" method="POST">
     <div class="form-group"><label for="name">Subscription Name</label><input id="name" name="name" type="text" value="<?= htmlspecialchars($_POST["name"] ?? "") ?>" placeholder="Netflix, Spotify, Gym" required></div>
     <div class="form-group"><label for="amount">Amount</label><input id="amount" name="amount" type="number" min="0.01" step="0.01" value="<?= htmlspecialchars($_POST["amount"] ?? "") ?>" placeholder="500" required></div>
@@ -204,5 +246,6 @@ include "../includes/header.php";
     <br>
     <button class="primary-button full-width" type="submit">ADD SUBSCRIPTION</button>
 </form>
+<?php endif; ?>
 
 <?php include "../includes/footer.php"; ?>

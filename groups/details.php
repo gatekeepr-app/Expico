@@ -338,12 +338,16 @@ foreach ($balances[$user_id] ?? [] as $counterparty_id => $amount) {
 $settlements = array_slice($settlements, 0, 4);
 $settlement_deadline = $group["settlement_deadline"] ?? null;
 $settlement_deadline_display = $settlement_deadline ? date("M j, Y", strtotime($settlement_deadline)) : "No date set";
+$deadline_passed = $settlement_deadline !== null && $settlement_deadline !== "" && $settlement_deadline <= date("Y-m-d");
 ?>
 
 <section class="summary-card">
     <p class="summary-label"><?= htmlspecialchars($group["group_name"]) ?></p>
     <div class="amount"><?= money($total) ?></div>
     <p class="summary-subtext">Total group expenses · Group ID #<?= (int) $group_id ?> · Settlement <?= htmlspecialchars($settlement_deadline ?: "anytime") ?></p>
+    <?php if ($deadline_passed): ?>
+        <p class="summary-subtext" style="color:#e74c3c;margin-top:6px;">Settlement period active — adding expenses and subscriptions is blocked.</p>
+    <?php endif; ?>
 </section>
 
 <?php if ($error): ?><div class="alert error" style="margin-top:14px;"><?= htmlspecialchars($error) ?></div><?php endif; ?>
@@ -359,7 +363,7 @@ $settlement_deadline_display = $settlement_deadline ? date("M j, Y", strtotime($
     <?php endwhile; ?>
 </div>
 
-<div class="section-header"><h2>Recent Expenses</h2><a class="section-link" href="../expenses/add.php?group_id=<?= $group_id ?>">Add</a></div>
+<div class="section-header"><h2>Recent Expenses</h2><?php if (!$deadline_passed): ?><a class="section-link" href="../expenses/add.php?group_id=<?= $group_id ?>">Add</a><?php endif; ?></div>
 <div class="card-list">
     <?php if ($expenses->num_rows > 0): ?>
         <?php while ($expense = $expenses->fetch_assoc()): ?>
@@ -374,7 +378,7 @@ $settlement_deadline_display = $settlement_deadline ? date("M j, Y", strtotime($
     <?php endif; ?>
 </div>
 
-<div class="section-header"><h2>Group Subscriptions</h2><a class="section-link" href="../subscriptions/add.php?group_id=<?= $group_id ?>">Add</a></div>
+<div class="section-header"><h2>Group Subscriptions</h2><?php if (!$deadline_passed): ?><a class="section-link" href="../subscriptions/add.php?group_id=<?= $group_id ?>">Add</a><?php endif; ?></div>
 <div class="card-list">
     <?php if ($subscriptions->num_rows > 0): ?>
         <?php while ($subscription = $subscriptions->fetch_assoc()): ?>

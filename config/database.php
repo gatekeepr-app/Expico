@@ -18,4 +18,8 @@ if ($conn->connect_error) {
 
 $conn->set_charset("utf8mb4");
 
+function format_category($name) {
+    return ($name !== "" && $name !== null) ? ucwords($name) : "";
+}
+
 ?>

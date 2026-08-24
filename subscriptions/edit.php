@@ -40,15 +40,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $conn->begin_transaction();
         try {
             $category_id = (int) ($subscription["category_id"] ?? 0);
+            $lower_cat = strtolower($category);
             if ($category !== "" && $category_id > 0) {
                 $description = "Updated from subscription form";
                 $stmt = $conn->prepare("UPDATE categories SET category_name = ?, description = ? WHERE category_id = ?");
-                $stmt->bind_param("ssi", $category, $description, $category_id); $stmt->execute();
+                $stmt->bind_param("ssi", $lower_cat, $description, $category_id); $stmt->execute();
             } elseif ($category !== "") {
-                $category_id = (int) ($conn->query("SELECT COALESCE(MAX(category_id), 0) + 1 AS next_id FROM categories")->fetch_assoc()["next_id"] ?? 1);
-                $description = "Updated from subscription form"; $expense_id = null;
-                $stmt = $conn->prepare("INSERT INTO categories (category_id, category_name, description, expense_id) VALUES (?, ?, ?, ?)");
-                $stmt->bind_param("issi", $category_id, $category, $description, $expense_id); $stmt->execute();
+                $check = $conn->prepare("SELECT category_id FROM categories WHERE LOWER(category_name) = ? LIMIT 1");
+                $check->bind_param("s", $lower_cat);
+                $check->execute();
+                $existing = $check->get_result()->fetch_assoc();
+                if ($existing) {
+                    $category_id = (int) $existing["category_id"];
+                } else {
+                    $category_id = (int) ($conn->query("SELECT COALESCE(MAX(category_id), 0) + 1 AS next_id FROM categories")->fetch_assoc()["next_id"] ?? 1);
+                    $description = "Updated from subscription form";
+                    $stmt = $conn->prepare("INSERT INTO categories (category_id, category_name, description) VALUES (?, ?, ?)");
+                    $stmt->bind_param("iss", $category_id, $lower_cat, $description); $stmt->execute();
+                }
             } elseif ($category_id > 0) {
                 $stmt = $conn->prepare("DELETE FROM categories WHERE category_id = ? AND expense_id IS NULL");
                 $stmt->bind_param("i", $category_id); $stmt->execute(); $category_id = null;
@@ -90,7 +99,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $conn->commit(); header("Location: details.php?subscription_id=" . $subscription_id); exit();
         } catch (Throwable $exception) { $conn->rollback(); $error = "Could not update subscription."; }
     }
-    $subscription = array_merge($subscription, ["name" => $name, "amount" => $amount, "billing_cycle" => $billing_cycle, "next_due_date" => $next_due_date, "category_name" => $category, "payment_method_id" => $payment_method_id, "group_id" => $group_id]);
+    $subscription = array_merge($subscription, ["name" => $name, "amount" => $amount, "billing_cycle" => $billing_cycle, "next_due_date" => $next_due_date, "category_name" => strtolower($category), "payment_method_id" => $payment_method_id, "group_id" => $group_id]);
 }
 
 $stmt = $conn->prepare("SELECT payment_method_id, method_type, account_details FROM payment_method WHERE user_id = ? ORDER BY is_default DESC, method_type");
@@ -115,7 +124,7 @@ $pageTitle = "Edit Subscription"; $pageSubtitle = "Update billing split"; $activ
     <div class="form-group"><label for="billing_cycle">Billing Cycle</label><select id="billing_cycle" name="billing_cycle"><?php foreach (["one_time"=>"One Time","weekly"=>"Weekly","monthly"=>"Monthly","yearly"=>"Yearly","custom"=>"Custom"] as $value=>$label): ?><option value="<?= $value ?>" <?= ($subscription["billing_cycle"] ?? "") === $value ? "selected" : "" ?>><?= $label ?></option><?php endforeach; ?></select></div>
     <div class="form-group"><label for="group_id">Group</label><select id="group_id" name="group_id" onchange="window.location='edit.php?subscription_id=<?= (int) $subscription_id ?>&group_id='+this.value"><option value="0">Personal subscription</option><?php while ($group = $groups->fetch_assoc()): ?><option value="<?= (int) $group["group_id"] ?>" <?= $selected_group_id === (int) $group["group_id"] ? "selected" : "" ?>><?= htmlspecialchars($group["group_name"]) ?></option><?php endwhile; ?></select></div>
     <div class="form-group"><label for="next_due_date">Next Due Date</label><input id="next_due_date" name="next_due_date" type="date" value="<?= htmlspecialchars($subscription["next_due_date"] ?? "") ?>"></div>
-    <div class="form-group"><label for="category">Category</label><input id="category" name="category" value="<?= htmlspecialchars($subscription["category_name"] ?? "") ?>"></div>
+    <div class="form-group"><label for="category">Category</label><input id="category" name="category" value="<?= htmlspecialchars(format_category($subscription["category_name"] ?? "")) ?>"></div>
     <div class="form-group"><label for="payment_method_id">Payment Method</label><select id="payment_method_id" name="payment_method_id"><option value="0">Not selected</option><?php while ($method = $payment_methods->fetch_assoc()): ?><option value="<?= (int) $method["payment_method_id"] ?>" <?= (int) ($subscription["payment_method_id"] ?? 0) === (int) $method["payment_method_id"] ? "selected" : "" ?>><?= htmlspecialchars($method["method_type"]) ?> · <?= htmlspecialchars($method["account_details"] ?? "") ?></option><?php endwhile; ?></select></div>
     <div class="form-group"><label>Who participates?</label><div class="card-list"><?php if ($selected_group_id > 0): foreach ($members as $member): ?><label class="participant-row"><input type="checkbox" name="participants[]" value="<?= (int) $member["user_id"] ?>" data-split-participant <?= in_array((int) $member["user_id"], $selected_participants, true) ? "checked" : "" ?>> <?= htmlspecialchars($member["name"]) ?></label><?php endforeach; else: ?><label class="participant-row"><input type="checkbox" name="participants[]" value="<?= (int) $user_id ?>" data-split-participant checked> <?= htmlspecialchars($_SESSION["user_name"] ?? "You") ?></label><?php endif; ?></div></div>
     <div class="split-preview"><div class="stat-pill"><span>Total</span><strong data-split-total>৳0.00</strong></div><div class="stat-pill"><span>Split between</span><strong data-split-count>0</strong></div><div class="stat-pill"><span>Each pays</span><strong data-split-each>৳0.00</strong></div></div><br>

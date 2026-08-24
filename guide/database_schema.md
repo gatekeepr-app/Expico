@@ -46,5 +46,11 @@ notifications ──> deadlines
 settlements ──> groups, users (paid_by, paid_to)
 ```
 
+## Settlement deadline
+`groups.settlement_deadline` is a date field that controls:
+- **Adding expenses/subscriptions**: Blocked when deadline <= today
+- **Paying dues (PAY DUE)**: Allowed when deadline <= today or no deadline set
+- **Admin can extend**: Setting a future deadline re-opens expense/subscription creation
+
 ## Sample data
 The SQL includes 7 users, 4 groups, 6 expenses, 2 subscriptions, 3 payment methods, and 18 notifications — enough to demo the full app.

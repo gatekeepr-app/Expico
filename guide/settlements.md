@@ -21,7 +21,13 @@ For each, it calculates a per-group, per-counterparty net amount. Positive = use
 | `subscription` | Pays a single subscription share. |
 | `legacy` | Pays a manual settlement record. |
 
-All actions send a notification to the receiver.
+All actions send a notification to the receiver. Each type checks the group's settlement deadline before allowing payment.
+
+### Settlement deadline behavior
+- **No deadline**: PAY DUE buttons are always active
+- **Deadline in future**: PAY DUE buttons show "PAY DUE AFTER [date]" and are disabled
+- **Deadline today or passed**: PAY DUE buttons are active
+- When a group's deadline is extended to a later date, payments become blocked again until that new date
 
 ### Display
 - **Summary**: "You Owe" and "You Are Owed" totals.
